@@ -1,15 +1,11 @@
-import { Menu, X, Settings, Sparkles } from 'lucide-react';
+import { Settings, Sparkles } from 'lucide-react';
 import { Button } from './ui/Button';
-import { Modal } from './ui/Modal';
-import { SettingsModal } from './SettingsModal';
-import type { AIServiceConfig } from '../types';
 
 interface NavbarProps {
   onSettingsClick: () => void;
-  hasApiKey: boolean;
 }
 
-export function Navbar({ onSettingsClick, hasApiKey }: NavbarProps) {
+export function Navbar({ onSettingsClick }: NavbarProps) {
   return (
     <nav className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

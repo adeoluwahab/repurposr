@@ -20,8 +20,6 @@ export function App() {
   const [config, setConfig] = useState<AIServiceConfig>(() => getDefaultConfig());
   const [showSettings, setShowSettings] = useState(false);
 
-  const hasApiKey = config.apiKey.trim().length > 0;
-
   const handleInputChange = useCallback((changes: Partial<ContentInput>) => {
     setInput((prev) => ({ ...prev, ...changes }));
     setError(null);
@@ -50,8 +48,8 @@ export function App() {
     setConfig(newConfig);
   }, []);
 
-  const handleTabChange = useCallback((tab: OutputPlatform) => {
-    setActiveTab(tab);
+  const handleTabChange = useCallback((tab: string) => {
+    setActiveTab(tab as OutputPlatform);
   }, []);
 
   const handleSettingsClose = useCallback(() => {
@@ -76,7 +74,7 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-      <Navbar onSettingsClick={() => setShowSettings(true)} hasApiKey={hasApiKey} />
+      <Navbar onSettingsClick={() => setShowSettings(true)} />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="space-y-8">

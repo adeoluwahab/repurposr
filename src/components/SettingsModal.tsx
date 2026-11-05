@@ -1,13 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Save, Loader2, Key, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { useState, useEffect, type ChangeEvent } from 'react';
+import { Save, Key, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Select } from './ui/Select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/Card';
-import { cn } from '../lib/utils';
 import type { AIServiceConfig } from '../types';
-import { getDefaultConfig, saveConfig } from '../services/aiService';
+import { saveConfig } from '../services/aiService';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -47,7 +46,6 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
   const [config, setConfig] = useState<AIServiceConfig>(currentConfig);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [showKey, setShowKey] = useState(false);
 
   useEffect(() => {
@@ -65,6 +63,10 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
     setSaveStatus('idle');
   };
 
+  const handleSelectChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    handleChange(e.target.name as keyof AIServiceConfig, e.target.value);
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
     setSaveStatus('idle');
@@ -78,19 +80,6 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleTestConnection = async () => {
-    if (!config.apiKey.trim()) return;
-    setTestStatus('testing');
-    try {
-      // Simple test - just validate the key format for now
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      setTestStatus('success');
-    } catch {
-      setTestStatus('error');
-    }
-    setTimeout(() => setTestStatus('idle'), 3000);
   };
 
   const models = MODEL_OPTIONS[config.provider] || MODEL_OPTIONS.custom;
@@ -114,8 +103,9 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
           <CardContent>
             <Select
               label="AI Provider"
+              name="provider"
               value={config.provider}
-              onChange={(v) => handleChange('provider', v)}
+              onChange={handleSelectChange}
               options={PROVIDER_OPTIONS}
               placeholder="Select provider"
             />
@@ -167,8 +157,9 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
 
             <Select
               label="Model"
+              name="model"
               value={config.model}
-              onChange={(v) => handleChange('model', v)}
+              onChange={handleSelectChange}
               options={models}
               placeholder="Select model"
             />

@@ -1,5 +1,5 @@
-import { useState, type ChangeEvent } from 'react';
-import { Mic, FileText, Trash2, Sparkles } from 'lucide-react';
+import { useState, type ChangeEvent, type CompositionEvent } from 'react';
+import { Trash2, Sparkles } from 'lucide-react';
 import { Textarea } from './ui/Input';
 import { Select } from './ui/Select';
 import { Button } from './ui/Button';
@@ -34,9 +34,9 @@ export function InputSection({ input, onInputChange, isGenerating, onGenerate, e
   };
 
   const handleCompositionStart = () => setIsComposing(true);
-  const handleCompositionEnd = (e: ChangeEvent<HTMLTextAreaElement>) => {
+  const handleCompositionEnd = (e: CompositionEvent<HTMLTextAreaElement>) => {
     setIsComposing(false);
-    onInputChange({ rawText: e.target.value });
+    onInputChange({ rawText: e.currentTarget.value });
   };
 
   const handleClear = () => {
@@ -45,6 +45,10 @@ export function InputSection({ input, onInputChange, isGenerating, onGenerate, e
 
   const handleTypeChange = (value: string) => {
     onInputChange({ contentType: value as ContentType });
+  };
+
+  const handleSelectChange = (e: ChangeEvent<HTMLSelectElement>) => {
+    handleTypeChange(e.target.value);
   };
 
   const charCount = input.rawText.length;
@@ -88,7 +92,7 @@ export function InputSection({ input, onInputChange, isGenerating, onGenerate, e
           <Select
             label="Content Style"
             value={input.contentType}
-            onChange={handleTypeChange}
+            onChange={handleSelectChange}
             options={CONTENT_TYPES.map((t) => ({ value: t.value, label: t.label }))}
             placeholder="Select content style"
             disabled={isGenerating}

@@ -1,10 +1,6 @@
 import type {
   ContentInput,
   GeneratedContent,
-  LinkedInPost,
-  TwitterThread,
-  NewsletterSummary,
-  VideoHook,
   AIServiceConfig,
 } from '../types';
 

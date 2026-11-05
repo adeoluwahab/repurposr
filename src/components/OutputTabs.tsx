@@ -1,16 +1,17 @@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/Tabs';
-import { Linkedin, Twitter, Mail, Video, Copy, Check, Sparkles } from 'lucide-react';
+import { Linkedin, Twitter, Mail, Video, Sparkles } from 'lucide-react';
 import { LinkedInCard } from './ContentCard';
 import { TwitterCard } from './ContentCard';
 import { NewsletterCard } from './ContentCard';
 import { VideoCard } from './ContentCard';
 import type { GeneratedContent, OutputPlatform } from '../types';
-import { PLATFORM_LABELS, PLATFORM_ICONS } from '../types';
+import { PLATFORM_LABELS } from '../types';
+import { cn } from '../lib/utils';
 
 interface OutputTabsProps {
   content: GeneratedContent;
   activeTab: OutputPlatform;
-  onTabChange: (tab: OutputPlatform) => void;
+  onTabChange: (tab: string) => void;
 }
 
 const tabIcons: Record<OutputPlatform, React.ReactNode> = {
@@ -26,7 +27,7 @@ export function OutputTabs({ content, activeTab, onTabChange }: OutputTabsProps)
   return (
     <div className="animate-slide-up">
       <Tabs defaultValue={activeTab} onValueChange={onTabChange}>
-        <TabsList className="w-full" role="tablist" aria-label="Content platforms">
+        <TabsList className="w-full">
           {platforms.map((platform) => (
             <TabsTrigger
               key={platform}
