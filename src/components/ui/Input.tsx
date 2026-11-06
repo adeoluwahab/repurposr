@@ -93,7 +93,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={textareaId}
           className={cn(
-            'flex min-h-[120px] w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-sm text-slate-900 dark:text-white placeholder:text-slate-400',
+            'flex min-h-[120px] w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-3 text-base text-slate-900 dark:text-white placeholder:text-slate-400',
             'transition-colors duration-200 resize-y',
             'focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent',
             'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-100 dark:disabled:bg-slate-800',
