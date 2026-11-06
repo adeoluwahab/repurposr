@@ -2,10 +2,10 @@
 
 Transform raw transcripts, articles, and notes into platform-optimized content for LinkedIn, X/Twitter, newsletters, and short-form video — instantly.
 
-![Repurposr Demo](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
+![Repurposr Demo](https://img.shields.io/badge/Status-Prototype-blue)
 ![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?logo=typescript)
-![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?logo=vite)
+![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-06B6D4?logo=tailwindcss)
 
 ## Features
@@ -19,9 +19,9 @@ Transform raw transcripts, articles, and notes into platform-optimized content f
 - **4 Content Styles**: Professional, Casual, Educational, Engaging — each with distinct voice and structure
 
 - **Flexible AI Integration**: 
-  - Works out-of-the-box with high-quality mock responses (no API key needed)
+  - Starts in demo mode with preset example responses (no API key needed)
   - Supports OpenAI, Anthropic, and custom endpoints (LocalAI, Ollama)
-  - API keys stored securely in localStorage only
+  - Provider settings are saved locally; API keys remain in page memory only
 
 - **Modern UX**: 
   - Skeleton loaders during generation
@@ -30,19 +30,19 @@ Transform raw transcripts, articles, and notes into platform-optimized content f
   - Fully responsive, mobile-first design
   - Dark mode support
 
-- **Privacy-First**: No data leaves your browser unless you configure an API key
+- **Direct provider requests**: Input and credentials are sent from your browser directly to the configured AI provider when you generate
 
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+ 
+- Node.js 20.19+ or 22.12+
 - npm 9+
 
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/repurposr.git
+# Replace OWNER with the GitHub account that hosts the repository
+git clone https://github.com/OWNER/repurposr.git
 cd repurposr
 
 # Install dependencies
@@ -64,8 +64,8 @@ Output will be in the `dist/` directory, ready for deployment to Vercel, Netlify
 
 ## Configuration
 
-### Using Mock Mode (Default)
-No configuration needed! The app includes high-quality mock responses for all content types so you can try it immediately.
+### Using Demo Mode (Default)
+No configuration is needed to explore the interface. Without an OpenAI or Anthropic API key, the app returns preset example content; it does not transform the text you enter. Custom endpoints can be configured without an API key.
 
 ### Using Your Own API Key
 
@@ -78,7 +78,7 @@ No configuration needed! The app includes high-quality mock responses for all co
 4. Optionally customize the model and base URL
 5. Click **Save Settings**
 
-Your API key is stored locally in your browser's localStorage and never sent to our servers.
+Provider settings are stored in browser `localStorage`; API keys are kept only in page memory and cleared when the page reloads. With a configured provider, your input and key are sent directly from your browser to that provider; they are not sent through a Repurposr server. Do not submit sensitive content unless you trust the provider. A browser-only app cannot safely conceal a shared/default API key from its users.
 
 ## Project Structure
 
@@ -145,15 +145,9 @@ netlify deploy --prod --dir=dist
 ### Static Hosting
 Upload the `dist/` folder to any static host (GitHub Pages, Cloudflare Pages, AWS S3, etc.)
 
-## Environment Variables
+## Security and deployment
 
-No environment variables required for basic usage. For production deployments with a default API key:
-
-```bash
-# .env (optional)
-VITE_DEFAULT_PROVIDER=openai
-VITE_DEFAULT_MODEL=gpt-4o-mini
-```
+This is a static, browser-only application. Do not put API keys in `VITE_*` environment variables or commit them: client-side values are visible to users. For a public service that provides shared credentials, add a trusted backend/proxy with authentication, rate limiting, and server-side secret storage. Custom endpoint URLs are sent from the user's browser and must support browser CORS.
 
 ## Scripts
 
@@ -163,6 +157,7 @@ VITE_DEFAULT_MODEL=gpt-4o-mini
 | `npm run build` | Type-check and build for production |
 | `npm run preview` | Preview production build locally |
 | `npm run lint` | Run ESLint |
+| `npm test` | Run service tests |
 
 ## Browser Support
 
@@ -173,7 +168,7 @@ VITE_DEFAULT_MODEL=gpt-4o-mini
 
 ## License
 
-MIT License — feel free to use for personal or commercial projects.
+See [LICENSE](./LICENSE).
 
 ## Contributing
 
@@ -192,4 +187,4 @@ MIT License — feel free to use for personal or commercial projects.
 
 ---
 
-**Built with ❤️ for content creators everywhere**
+**Built with ❤️ for content creators everywhere**# repurposr

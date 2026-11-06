@@ -1,12 +1,17 @@
 import type {
+  ContentType,
   ContentInput,
+  LinkedInPost,
+  TwitterThread,
+  NewsletterSummary,
+  VideoHook,
   GeneratedContent,
   AIServiceConfig,
 } from '../types';
 
 const MOCK_DELAY = 1500;
 
-const MOCK_RESPONSES: Record<string, GeneratedContent> = {
+const MOCK_RESPONSES: Record<ContentType, GeneratedContent> = {
   professional: {
     linkedin: {
       hook: "The biggest mistake I see professionals make? Thinking 'busy' equals 'productive.'",
@@ -177,8 +182,8 @@ const MOCK_RESPONSES: Record<string, GeneratedContent> = {
   },
 };
 
-function getMockResponse(contentType: string): GeneratedContent {
-  return MOCK_RESPONSES[contentType] || MOCK_RESPONSES.professional;
+function getMockResponse(contentType: ContentType): GeneratedContent {
+  return MOCK_RESPONSES[contentType];
 }
 
 function buildPrompt(input: ContentInput): string {
@@ -230,10 +235,48 @@ Return ONLY valid JSON matching this exact structure:
 }`;
 }
 
+function getProviderUrl(provider: AIServiceConfig['provider'], baseUrl?: string): string {
+  const defaultBaseUrls = {
+    openai: 'https://api.openai.com/v1',
+    anthropic: 'https://api.anthropic.com/v1',
+    custom: '',
+  };
+  const base = (baseUrl || defaultBaseUrls[provider]).trim().replace(/\/+$/, '');
+
+  if (!base) {
+    throw new Error('Custom provider requires a base URL.');
+  }
+
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(base);
+  } catch {
+    throw new Error('Enter a valid API URL, including http:// or https://.');
+  }
+
+  if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+    throw new Error('API URLs must use http:// or https://.');
+  }
+
+  if (provider === 'custom') {
+    return base;
+  }
+
+  const endpoint = provider === 'openai' ? 'chat/completions' : 'messages';
+  if (parsedUrl.pathname.endsWith(`/${endpoint}`)) {
+    return base;
+  }
+
+  const path = parsedUrl.pathname === '/' ? '/v1' : parsedUrl.pathname;
+  parsedUrl.pathname = `${path}/${endpoint}`;
+  parsedUrl.hash = '';
+  return parsedUrl.toString();
+}
+
 async function callLLMApi(prompt: string, config: AIServiceConfig): Promise<string> {
   const { provider, apiKey, baseUrl, model } = config;
 
-  if (!apiKey || apiKey.trim() === '') {
+  if ((!apiKey || apiKey.trim() === '') && provider !== 'custom') {
     throw new Error('API key is required. Please configure your API key in Settings.');
   }
 
@@ -246,7 +289,7 @@ async function callLLMApi(prompt: string, config: AIServiceConfig): Promise<stri
 
   switch (provider) {
     case 'openai':
-      url = baseUrl || 'https://api.openai.com/v1/chat/completions';
+      url = getProviderUrl(provider, baseUrl);
       headers['Authorization'] = `Bearer ${apiKey}`;
       body = {
         model: model || 'gpt-4o-mini',
@@ -261,9 +304,10 @@ async function callLLMApi(prompt: string, config: AIServiceConfig): Promise<stri
       break;
 
     case 'anthropic':
-      url = baseUrl || 'https://api.anthropic.com/v1/messages';
+      url = getProviderUrl(provider, baseUrl);
       headers['x-api-key'] = apiKey;
       headers['anthropic-version'] = '2023-06-01';
+      headers['anthropic-dangerous-direct-browser-access'] = 'true';
       body = {
         model: model || 'claude-3-haiku-20240307',
         max_tokens: 3000,
@@ -274,9 +318,10 @@ async function callLLMApi(prompt: string, config: AIServiceConfig): Promise<stri
       break;
 
     case 'custom':
-      if (!baseUrl) throw new Error('Custom provider requires a base URL');
-      url = baseUrl;
-      headers['Authorization'] = `Bearer ${apiKey}`;
+      url = getProviderUrl(provider, baseUrl);
+      if (apiKey.trim()) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
       body = {
         model: model || 'default',
         messages: [
@@ -292,6 +337,11 @@ async function callLLMApi(prompt: string, config: AIServiceConfig): Promise<stri
       throw new Error(`Unknown provider: ${provider}`);
   }
 
+  if (!apiKey.trim()) {
+    delete headers['Authorization'];
+    delete headers['x-api-key'];
+  }
+
   const response = await fetch(url, {
     method: 'POST',
     headers,
@@ -299,78 +349,205 @@ async function callLLMApi(prompt: string, config: AIServiceConfig): Promise<stri
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
+    let errorMessage: string | undefined;
+    try {
+      const errorData: unknown = await response.json();
+      if (
+        typeof errorData === 'object' &&
+        errorData !== null &&
+        'error' in errorData &&
+        typeof errorData.error === 'object' &&
+        errorData.error !== null &&
+        'message' in errorData.error &&
+        typeof errorData.error.message === 'string'
+      ) {
+        errorMessage = errorData.error.message;
+      }
+    } catch {
+      // Some providers return a non-JSON error body.
+    }
     throw new Error(
-      errorData.error?.message ||
+      errorMessage ||
       `API request failed: ${response.status} ${response.statusText}`
     );
   }
 
-  const data = await response.json();
+  const data: unknown = await response.json();
 
   if (provider === 'anthropic') {
-    return data.content[0]?.text || '';
+    if (
+      typeof data === 'object' &&
+      data !== null &&
+      'content' in data &&
+      Array.isArray(data.content)
+    ) {
+      const textBlock = data.content.find(
+        (block): block is { type: 'text'; text: string } =>
+          typeof block === 'object' &&
+          block !== null &&
+          'type' in block &&
+          block.type === 'text' &&
+          'text' in block &&
+          typeof block.text === 'string'
+      );
+      if (textBlock) return textBlock.text;
+    }
+    throw new Error('The AI provider returned an unexpected response.');
   }
 
-  return data.choices[0]?.message?.content || '';
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    'choices' in data &&
+    Array.isArray(data.choices)
+  ) {
+    const firstChoice = data.choices[0];
+    if (
+      typeof firstChoice === 'object' &&
+      firstChoice !== null &&
+      'message' in firstChoice &&
+      typeof firstChoice.message === 'object' &&
+      firstChoice.message !== null &&
+      'content' in firstChoice.message &&
+      typeof firstChoice.message.content === 'string'
+    ) {
+      return firstChoice.message.content;
+    }
+  }
+  throw new Error('The AI provider returned an unexpected response.');
 }
 
 function parseAndValidateResponse(text: string): GeneratedContent {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(text);
-
-    const requiredFields = ['linkedin', 'twitter', 'newsletter', 'video'];
-    for (const field of requiredFields) {
-      if (!parsed[field]) {
-        throw new Error(`Missing required field: ${field}`);
-      }
-    }
-
-    if (!Array.isArray(parsed.video) || parsed.video.length !== 3) {
-      throw new Error('Video must be an array of 3 hooks');
-    }
-
-    return parsed as GeneratedContent;
-  } catch (error) {
-    console.error('Failed to parse AI response:', error);
+    parsed = JSON.parse(text);
+  } catch {
     throw new Error('Invalid response format from AI. Please try again.');
   }
+
+  if (!isRecord(parsed)) {
+    throw new Error('AI response must be a JSON object. Please try again.');
+  }
+
+  const { linkedin, twitter, newsletter, video } = parsed;
+  if (!isLinkedInPost(linkedin)) {
+    throw new Error('AI returned incomplete LinkedIn content. Please try again.');
+  }
+  if (!isTwitterThread(twitter)) {
+    throw new Error('AI returned incomplete thread content. Please try again.');
+  }
+  if (!isNewsletterSummary(newsletter)) {
+    throw new Error('AI returned incomplete newsletter content. Please try again.');
+  }
+  if (!isVideoHookList(video)) {
+    throw new Error('AI must return three complete video hooks. Please try again.');
+  }
+
+  return { linkedin, twitter, newsletter, video };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isLinkedInPost(value: unknown): value is LinkedInPost {
+  return (
+    isRecord(value) &&
+    isText(value.hook) &&
+    isText(value.body) &&
+    Array.isArray(value.hashtags) &&
+    value.hashtags.every(isText) &&
+    isText(value.callToAction)
+  );
+}
+
+function isTwitterThread(value: unknown): value is TwitterThread {
+  return (
+    isRecord(value) &&
+    isText(value.hook) &&
+    Array.isArray(value.tweets) &&
+    value.tweets.length > 0 &&
+    value.tweets.every(isText) &&
+    isText(value.callToAction)
+  );
+}
+
+function isNewsletterSummary(value: unknown): value is NewsletterSummary {
+  return (
+    isRecord(value) &&
+    isText(value.subjectLine) &&
+    isText(value.preheader) &&
+    isText(value.body) &&
+    isText(value.cta)
+  );
+}
+
+function isVideoHookList(value: unknown): value is VideoHook[] {
+  return (
+    Array.isArray(value) &&
+    value.length === 3 &&
+    value.every(
+      (hook): hook is VideoHook =>
+        isRecord(hook) &&
+        isText(hook.hook) &&
+        isText(hook.visualCue) &&
+        isText(hook.duration)
+    )
+  );
 }
 
 export async function generateContent(input: ContentInput, config: AIServiceConfig): Promise<GeneratedContent> {
-  if (!config.apiKey || config.apiKey.trim() === '') {
+  if ((!config.apiKey || config.apiKey.trim() === '') && config.provider !== 'custom') {
     await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
     return getMockResponse(input.contentType);
   }
 
   const prompt = buildPrompt(input);
-
-  try {
-    const responseText = await callLLMApi(prompt, config);
-    return parseAndValidateResponse(responseText);
-  } catch (error) {
-    console.error('AI generation failed, falling back to mock:', error);
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return getMockResponse(input.contentType);
-  }
+  const responseText = await callLLMApi(prompt, config);
+  return parseAndValidateResponse(responseText);
 }
 
 export function getDefaultConfig(): AIServiceConfig {
-  const stored = localStorage.getItem('repurposr_ai_config');
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      // Ignore parse errors
-    }
-  }
-  return {
+  const defaultConfig: AIServiceConfig = {
     provider: 'openai',
     apiKey: '',
     model: 'gpt-4o-mini',
   };
+  try {
+    const stored = localStorage.getItem('repurposr_ai_config');
+    if (stored) {
+      const parsed: unknown = JSON.parse(stored);
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        'provider' in parsed &&
+        ['openai', 'anthropic', 'custom'].includes(String(parsed.provider)) &&
+        'apiKey' in parsed &&
+        typeof parsed.apiKey === 'string'
+      ) {
+        const config: AIServiceConfig = {
+          provider: parsed.provider as AIServiceConfig['provider'],
+          apiKey: '',
+          baseUrl: 'baseUrl' in parsed && typeof parsed.baseUrl === 'string' ? parsed.baseUrl : '',
+          model: 'model' in parsed && typeof parsed.model === 'string' ? parsed.model : '',
+        };
+        localStorage.setItem('repurposr_ai_config', JSON.stringify(config));
+        return config;
+      }
+    }
+  } catch {
+    return defaultConfig;
+  }
+  return defaultConfig;
 }
 
 export function saveConfig(config: AIServiceConfig): void {
-  localStorage.setItem('repurposr_ai_config', JSON.stringify(config));
+  localStorage.setItem(
+    'repurposr_ai_config',
+    JSON.stringify({ ...config, apiKey: '' })
+  );
 }

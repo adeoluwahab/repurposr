@@ -36,7 +36,7 @@ const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
   ],
 };
 
-const DEFAULT_BASE_URLS: Record<string, string> = {
+const DEFAULT_BASE_URLS: Record<AIServiceConfig['provider'], string> = {
   openai: 'https://api.openai.com/v1',
   anthropic: 'https://api.anthropic.com/v1',
   custom: '',
@@ -46,21 +46,25 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
   const [config, setConfig] = useState<AIServiceConfig>(currentConfig);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [saveError, setSaveError] = useState('');
   const [showKey, setShowKey] = useState(false);
 
   useEffect(() => {
     setConfig(currentConfig);
     setSaveStatus('idle');
+    setSaveError('');
   }, [currentConfig, isOpen]);
 
   const handleChange = (field: keyof AIServiceConfig, value: string) => {
     const newConfig = { ...config, [field]: value };
     if (field === 'provider') {
-      newConfig.baseUrl = DEFAULT_BASE_URLS[value] || '';
-      newConfig.model = MODEL_OPTIONS[value]?.[0]?.value || '';
+      const provider = value as AIServiceConfig['provider'];
+      newConfig.baseUrl = DEFAULT_BASE_URLS[provider] || '';
+      newConfig.model = MODEL_OPTIONS[provider]?.[0]?.value || '';
     }
     setConfig(newConfig);
     setSaveStatus('idle');
+    setSaveError('');
   };
 
   const handleSelectChange = (e: ChangeEvent<HTMLSelectElement>) => {
@@ -70,16 +74,17 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
   const handleSave = async () => {
     setIsSaving(true);
     setSaveStatus('idle');
+    let persistenceError: string | null = null;
     try {
       saveConfig(config);
-      onConfigChange(config);
-      setSaveStatus('success');
-      setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
-      setSaveStatus('error');
-    } finally {
-      setIsSaving(false);
+      persistenceError = error instanceof Error ? error.message : 'Unable to save settings.';
     }
+    onConfigChange(config);
+    setSaveStatus(persistenceError ? 'error' : 'success');
+    setSaveError(persistenceError ?? '');
+    setTimeout(() => setSaveStatus('idle'), 3000);
+    setIsSaving(false);
   };
 
   const models = MODEL_OPTIONS[config.provider] || MODEL_OPTIONS.custom;
@@ -89,7 +94,7 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
       isOpen={isOpen}
       onClose={onClose}
       title="AI Provider Settings"
-      description="Configure your LLM API provider and credentials. Your API key is stored locally in your browser."
+      description="Configure your LLM provider and credentials. Browser storage is not encrypted."
       size="lg"
     >
       <div className="space-y-6">
@@ -97,7 +102,7 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
           <CardHeader>
             <CardTitle>Provider Selection</CardTitle>
             <CardDescription>
-              Choose your AI provider. Each provider requires a valid API key.
+              OpenAI and Anthropic require API keys. Custom endpoints can be configured with or without one.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -116,7 +121,7 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
           <CardHeader>
             <CardTitle>API Configuration</CardTitle>
             <CardDescription>
-              Enter your API credentials. Keys are stored locally in your browser's localStorage.
+              Provider settings are saved in this browser. Your API key is kept in memory only.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -127,7 +132,7 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
                 value={config.apiKey}
                 onChange={(e) => handleChange('apiKey', e.target.value)}
                 placeholder="Enter your API key"
-                helperText="Your key never leaves your browser. Stored in localStorage only."
+                helperText="Kept in memory for this page session and sent directly to your selected provider. Reloading clears it."
               />
               <Button
                 variant="ghost"
@@ -148,11 +153,11 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
             </div>
 
             <Input
-              label="Base URL (Optional)"
+              label={config.provider === 'custom' ? 'Custom API Endpoint URL' : 'API Base URL (Optional)'}
               value={config.baseUrl}
               onChange={(e) => handleChange('baseUrl', e.target.value)}
               placeholder={DEFAULT_BASE_URLS[config.provider] || 'Enter custom endpoint URL'}
-              helperText={config.provider === 'custom' ? 'Required for custom endpoints' : 'Leave empty to use default'}
+              helperText={config.provider === 'custom' ? 'Required; enter the full chat-completions-compatible endpoint URL' : 'Leave empty to use the provider default'}
             />
 
             <Select
@@ -171,8 +176,8 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
             <div className="flex items-start gap-3">
               <Info className="h-5 w-5 text-brand-600 dark:text-brand-400 mt-0.5 shrink-0" />
               <div className="text-sm text-slate-700 dark:text-slate-300 space-y-2">
-                <p><strong>Mock Mode:</strong> When no API key is provided, Repurposr uses high-quality mock responses that demonstrate all features.</p>
-                <p><strong>Privacy:</strong> Your API key is stored only in your browser's localStorage. It's never sent to our servers.</p>
+                <p><strong>Demo Mode:</strong> Without an OpenAI or Anthropic key, the app shows preset example content; it does not transform your input. A custom endpoint can be used without a key.</p>
+                <p><strong>Privacy:</strong> Your API key is not saved in browser storage and is cleared when this page reloads. When you generate with a provider, your input and key are sent directly from your browser to that provider. Do not enter sensitive content unless you trust the provider.</p>
                 <p><strong>Costs:</strong> You're responsible for any API usage costs from your provider.</p>
               </div>
             </div>
@@ -204,7 +209,7 @@ export function SettingsModal({ isOpen, onClose, currentConfig, onConfigChange }
         {saveStatus === 'error' && (
           <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400 animate-slide-down">
             <AlertCircle className="h-4 w-4" />
-            Failed to save settings. Please try again.
+            Settings are active for this session but could not be saved: {saveError}
           </div>
         )}
       </div>
